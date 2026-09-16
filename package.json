@@ -1,0 +1,9 @@
+{
+  "name": "repo-cd",
+  "version": "0.1.0",
+  "description": "Menu TUI para saltar a un repo y lanzar opencode --auto",
+  "type": "module",
+  "dependencies": {
+    "picocolors": "^1.1.1"
+  }
+}
