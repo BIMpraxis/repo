@@ -1,8 +1,17 @@
 {
   "name": "repo-cd",
   "version": "0.1.0",
-  "description": "Menu TUI para saltar a un repo y lanzar opencode --auto",
+  "description": "TUI menu to jump to a repo and launch opencode --auto",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BIMpraxis/repo.git"
+  },
+  "homepage": "https://github.com/BIMpraxis/repo#readme",
+  "bugs": {
+    "url": "https://github.com/BIMpraxis/repo/issues"
+  },
   "dependencies": {
     "picocolors": "^1.1.1"
   }

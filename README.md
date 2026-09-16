@@ -1,3 +1,5 @@
+**English version: [README.en.md](README.en.md)**
+
 # repo
 
 Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `opencode --auto` en él, en la misma terminal.
@@ -11,8 +13,8 @@ Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `
 
 ## Dependencias de la TUI
 
-- ** AXVKRGWJKW**: colores (`◆ ◇ ■ ❯ │ └`, verde/cian/atenuado). Única dependencia, instalada en local.
-- **UXSR 9OVUSSGUO**: `keypress` en modo raw para flechas, `Intro`, `Esc` y filtrado por texto.
+- **picocolors**: colores (`◆ ◇ ■ ❯ │ └`, verde/cian/atenuado). Única dependencia, instalada en local.
+- **Node readline**: `keypress` en modo raw para flechas, `Intro`, `Esc` y filtrado por texto.
 - El componente es un port a selección única de `searchMultiselect` (`src/prompts/search-multiselect.ts`) de [vercel-labs/skills](https://github.com/vercel-labs/skills): ventana fija con `↑/↓ N more`, cursor acotado sin wrap y conteo de filas visuales reales para el borrado del fotograma.
 - Requiere **Node.js ≥ 22**. Sin `.ps1`, sin instalación global de npm.
 
@@ -22,14 +24,14 @@ Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `
 doble clic en install.cmd   (o: node install.js)
 ```
 
-Añade esta carpeta al PATH de usuario (idempotente, edita el registro sin truncar) e instala `picocolors` si falta (`npm install`). Cierra y reabre la terminal.
+Añade esta carpeta al PATH de usuario (idempotente, edita el registro sin truncar). Cierra y reabre la terminal.
 
 ## Configuración
 
-`%USERPROFILE%\.repo\repoconfig.json` (se autocrea con estos valores la primera vez):
+`%USERPROFILE%\.repo\repoconfig.json` (se autocrea vacía la primera vez; añade tus carpetas madre):
 
 ```json
-{ "roots": ["D:\\repos-bimpraxis", "D:\\repos-idom"] }
+{ "roots": ["C:\\repos"] }
 ```
 
 ## Teclas
@@ -44,3 +46,7 @@ Añade esta carpeta al PATH de usuario (idempotente, edita el registro sin trunc
 ## Desinstalación
 
 Quita esta carpeta del PATH de usuario y bórrala. No deja nada más (la config vive en `%USERPROFILE%\.repo\`).
+
+## Licencia
+
+MIT — ver [LICENSE](LICENSE).

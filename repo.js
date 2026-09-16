@@ -99,7 +99,7 @@ const CONFIG_PATH = join(CONFIG_DIR, 'repoconfig.json');
 function loadRoots() {
   if (!existsSync(CONFIG_PATH)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify({ roots: ['D:\\repos-bimpraxis', 'D:\\repos-idom'] }, null, 2));
+    writeFileSync(CONFIG_PATH, JSON.stringify({ roots: [] }, null, 2));
     console.log(`Creada config ${CONFIG_PATH}`);
   }
   return JSON.parse(readFileSync(CONFIG_PATH, 'utf8')).roots;
