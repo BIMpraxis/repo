@@ -22,6 +22,8 @@
 
 **Shim**: envoltorio que npm crea en `%APPDATA%\npm` al instalar globalmente (`repo`, `repo.cmd`, `repo.ps1`). En PowerShell gana `repo.ps1` y hay que borrarlo. _Avoid_: wrapper, enlace, alias.
 
+**Instalación desde Git**: instalar el CLI con `npm install -g github:BIMpraxis/repo`, sin registro ni cuenta; es la vía vigente. _Avoid_: instalación desde npm (en pausa).
+
 ## Relationships
 
 - Una **carpeta madre** contiene uno o más **repositorios** (subcarpetas directas).

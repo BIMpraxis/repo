@@ -9,7 +9,8 @@ Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `
 1. Lee las carpetas madre de `%USERPROFILE%\.repo\repoconfig.json`.
 2. Muestra sus subcarpetas como `madre/repo` en un selector con ventana de 12 filas, filtro `Search:` y redibujado in situ.
 3. Con `Intro` lanza `opencode --auto` con el repo elegido como directorio de trabajo. `Esc` cancela.
-4. Al salir de OpenCode vuelves a tu carpeta original (un proceso hijo no puede hacer `cd` persistente en la shell padre).
+4. Al final de la lista hay una opción **«+ Nuevo repo…»**: eliges carpeta madre, escribes un nombre y se crea la carpeta; después se abre OpenCode en ella como en cualquier otro repo.
+5. Al salir de OpenCode vuelves a tu carpeta original (un proceso hijo no puede hacer `cd` persistente en la shell padre).
 
 ## Dependencias de la TUI
 
@@ -20,13 +21,19 @@ Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `
 
 ## Instalación
 
-Pega literalmente esta línea en PowerShell (requiere Node.js ≥ 22):
+Se instala directamente desde GitHub: no hace falta cuenta ni registro de npm. Requiere **Node.js ≥ 22** y Git. Pega literalmente esta línea en PowerShell:
 
 ```powershell
-npm install -g repo-oc; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
+npm install -g github:BIMpraxis/repo; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
 ```
 
-Instala por npm, borra la cuña `.ps1` autogenerada y deja `repo` funcionando desde cualquier carpeta.
+Desde una copia local del repositorio (desarrollo):
+
+```powershell
+npm install -g .
+```
+
+El comando `repo` queda disponible desde cualquier carpeta.
 
 ## Configuración
 

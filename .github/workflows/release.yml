@@ -1,8 +1,8 @@
 name: release
 
+# En pausa: se lanza solo a mano mientras no exista el publicador de confianza
+# de npm (ver docs/RELEASE.md). Evita ejecuciones en rojo en cada push.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -41,14 +41,17 @@ jobs:
       - name: Comprobaciones
         run: npm run check
 
+      - name: Herramientas de release
+        run: npm install --no-save semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/changelog @semantic-release/npm @semantic-release/git @semantic-release/github
+
       - name: Simulacro
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        if: inputs.dry_run
         run: npx semantic-release --dry-run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publicar
-        if: github.event_name == 'push' || inputs.dry_run == false
+        if: inputs.dry_run == false
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

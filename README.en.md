@@ -9,7 +9,8 @@ Type `repo` in PowerShell, pick a repository from a TUI menu, and `opencode --au
 1. Reads the parent folders from `%USERPROFILE%\.repo\repoconfig.json`.
 2. Lists their subfolders as `parent/repo` in a selector with a 12-row window, `Search:` filter and in-place redraw.
 3. `Enter` launches `opencode --auto` with the chosen repo as working directory. `Esc` cancels.
-4. When you quit OpenCode you are back in your original folder (a child process cannot persist `cd` in the parent shell).
+4. At the end of the list there is a **«+ Nuevo repo…»** option: pick a parent folder, type a name, and the folder is created; OpenCode then opens in it like in any other repo.
+5. When you quit OpenCode you are back in your original folder (a child process cannot persist `cd` in the parent shell).
 
 ## TUI dependencies
 
@@ -20,13 +21,19 @@ Type `repo` in PowerShell, pick a repository from a TUI menu, and `opencode --au
 
 ## Install
 
-Paste literally this line into PowerShell (requires Node.js ≥ 22):
+It installs straight from GitHub: no npm account or registry needed. Requires **Node.js ≥ 22** and Git. Paste literally this line into PowerShell:
 
 ```powershell
-npm install -g repo-oc; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
+npm install -g github:BIMpraxis/repo; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
 ```
 
-It installs via npm, deletes the auto-generated `.ps1` shim and leaves `repo` working from any folder.
+From a local copy of the repository (development):
+
+```powershell
+npm install -g .
+```
+
+The `repo` command becomes available from any folder.
 
 ## Configuration
 

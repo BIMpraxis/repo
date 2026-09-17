@@ -1,12 +1,36 @@
-# Release — repo-oc
+# Release y distribución — repo-oc
 
-Cómo se publica el paquete. Complementa `PRD.md` (motivos y contratos) y `CONTEXT.md` (glosario).
+Cómo se distribuye y cómo se publica el paquete. Complementa `PRD.md` (motivos y contratos) y `CONTEXT.md` (glosario).
 
-## Resumen en una frase
+## Vía vigente: instalar desde Git (sin npm)
 
-Escribes un commit con Conventional Commits y lo subes a `main`: el CI calcula la versión, escribe el CHANGELOG, crea el tag, publica en npm y crea la release de GitHub. Tú no tocas npm.
+No hace falta cuenta ni registro. Requiere Node ≥ 22 y Git:
 
-## Quién hace qué
+```powershell
+npm install -g github:BIMpraxis/repo; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
+```
+
+Desde una copia local (desarrollo): `npm install -g .`
+
+Ventaja: cero autenticación. El precio es que la instalación baja el repositorio completo y no hay número de versión en el registro.
+
+## Estado de la publicación en npm (en pausa)
+
+- Última versión publicada: **0.1.1** (2026-09-17), a mano. La siguiente será la **0.2.0**, que ya incluye la entrada «+ Nuevo repo…».
+- **Motivo de la pausa**: la cuenta npm está en solo lectura durante 72 h. Lo dispara el uso de un **código de recuperación de 2FA** (protección preventiva de npm, documentada en el GitHub Changelog del 25/06/2026). Se levanta sola, sin trámites.
+- **Segundo impedimento**: todavía no existe el **publicador de confianza**, que hay que crear una vez desde el navegador con 2FA.
+- Por eso `release.yml` se lanza **solo a mano** (`workflow_dispatch`) y no en cada push: evita ejecuciones en rojo mientras falte el publicador. Cuando exista, se le devuelve el disparo por push a `main`.
+
+## Trampa de 2FA detectada (Windows 10, cuenta local)
+
+El challenge de 2FA de npm con «Windows Hello» en Chrome se queda colgado en «Estamos comprobando que eres tú». Causas comprobadas:
+
+- El equipo es **Windows 10** y la cuenta de Windows es **local** (`BIMPRAXIS2\USER`). La experiencia nativa de passkeys (Ajustes → Cuentas → Passkeys) es de **Windows 11**; el correo de Windows no influye en nada.
+- El bloqueo de 72 h **solo** lo disparan el cambio de email y el uso de un código de recuperación. Reintentar el challenge **no** lo reinicia.
+
+Alternativas baratas, **sin probar todavía**: hacer el challenge en Edge en lugar de Chrome, o guardar la passkey en el gestor de Chrome (requiere cuenta de Google). La vía oficial para problemas de 2FA es un ticket en `https://www.npmjs.com/support`.
+
+## Quién hace qué cuando se reactive npm
 
 | Pieza | Fichero | Qué hace |
 |---|---|---|
@@ -15,19 +39,7 @@ Escribes un commit con Conventional Commits y lo subes a `main`: el CI calcula l
 | Release | `.github/workflows/release.yml` | Versión + CHANGELOG + tag + publicación por OIDC + release de GitHub |
 | Configuración | `.releaserc.json` | Orden de los pasos de `semantic-release` |
 
-## Flujo normal
-
-1. Se trabaja y se commitea con Conventional Commits (`feat:`, `fix:`, `chore:`…).
-2. Push a `main` (o merge de un PR).
-3. `ci.yml` comprueba; `release.yml` decide si toca release:
-   - `feat:` → sube versión menor; `fix:` → sube parche; `chore:`/`docs:` → no publica.
-4. Si toca release, el propio workflow escribe el CHANGELOG, sube la versión en `package.json`, crea el tag `vX.Y.Z`, publica en npm y crea la release de GitHub.
-
-El commit que hace el bot lleva `[skip ci]` para no dispararse a sí mismo.
-
-## Prueba sin publicar
-
-En GitHub → *Actions* → *release* → **Run workflow** con `dry_run` activado. No publica ni escribe nada: solo muestra la versión y las notas que saldrían.
+Las herramientas de `semantic-release` **no** están en `devDependencies`: el workflow las instala con `npm install --no-save` para que la instalación desde Git siga siendo ligera (solo `picocolors`).
 
 ## Autenticación: sin tokens
 
@@ -35,8 +47,7 @@ La publicación se autentica con **publicador de confianza** (trusted publishing
 
 - Requisitos: `id-token: write` en el job (ya está) y que el fichero del workflow exista en `.github/workflows/` (ya existe).
 - La provenance se genera **sola**; no hay que añadir `--provenance`.
-- Configuración (una sola vez): `https://www.npmjs.com/package/repo-oc/access` → *Trusted Publisher* → GitHub Actions → owner `BIMpraxis`, repo `repo`, workflow `release.yml`, entorno vacío, permitir **`npm publish`**.
-- Para administrar esa configuración hace falta `npm login` con 2FA una vez.
+- Configuración (una sola vez): `https://www.npmjs.com/package/repo-oc/access` → *Trusted Publisher* → GitHub Actions → owner `BIMpraxis`, repo `repo`, workflow `release.yml`, entorno vacío, permitir **`npm publish`**. Ojo: los campos no se pueden editar después.
 
 ## Datos verificados del paquete
 
@@ -47,18 +58,6 @@ La publicación se autentica con **publicador de confianza** (trusted publishing
 | Responsable | `bimpraxis <juliopablo@bimpraxis.com>` | `npm view repo-oc maintainers` |
 | Publicado a mano | 0.1.0 → 2026-09-16T23:37:33Z; 0.1.1 → 2026-09-17T00:08:19Z | `npm view repo-oc time --json` |
 | Contenido del tarball 0.1.1 | `LICENSE`, `package.json`, ambos README y `bin/repo.mjs` | `npm pack repo-oc@0.1.1` |
-
-## Vía de emergencia (publicar a mano)
-
-Solo si el CI no está disponible:
-
-1. `npm whoami` debe responder `bimpraxis`. Si da `E401`, ejecuta `npm login`.
-2. `npm run check` (debe terminar en «todo en orden»).
-3. `npm version patch` (o `minor`/`major`), revisando antes el CHANGELOG a mano.
-4. `npm publish`.
-5. `npm install -g repo-oc@latest; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force` para actualizar este equipo.
-
-El token que había en `%USERPROFILE%\.npmrc` caducó (E401, verificado el 2026-09-17) y ya no hace falta para el flujo normal.
 
 ## Trampas conocidas
 
