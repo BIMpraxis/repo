@@ -16,15 +16,17 @@ Type `repo` in PowerShell, pick a repository from a TUI menu, and `opencode --au
 - **picocolors**: colors (`◆ ◇ ■ ❯ │ └`, green/cyan/dim). Single dependency, installed locally.
 - **Node readline**: raw-mode `keypress` for arrows, `Enter`, `Esc` and text filtering.
 - The component is a single-select port of `searchMultiselect` (`src/prompts/search-multiselect.ts`) from [vercel-labs/skills](https://github.com/vercel-labs/skills): fixed window with `↑/↓ N more`, clamped cursor with no wrap, and real visual-row counting to erase each frame.
-- Requires **Node.js ≥ 22**. No `.ps1`, no global npm install.
+- Requires **Node.js ≥ 22**. No `.ps1` (the shim npm generates is removed on install).
 
 ## Install
 
-```
-double-click install.cmd   (or: node install.js)
+Paste literally this line into PowerShell (requires Node.js ≥ 22):
+
+```powershell
+npm install -g repo-oc; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
 ```
 
-Adds this folder to the user PATH (idempotent, edits the registry without truncating). Close and reopen the terminal.
+It installs via npm, deletes the auto-generated `.ps1` shim and leaves `repo` working from any folder.
 
 ## Configuration
 
@@ -45,7 +47,11 @@ Adds this folder to the user PATH (idempotent, edits the registry without trunca
 
 ## Uninstall
 
-Remove this folder from the user PATH and delete it. Nothing else is left behind (the config lives in `%USERPROFILE%\.repo\`).
+```powershell
+npm rm -g repo-oc
+```
+
+Only your config remains in `%USERPROFILE%\.repo\`; delete it if you want.
 
 ## License
 

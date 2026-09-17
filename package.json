@@ -1,9 +1,18 @@
 {
-  "name": "repo-cd",
-  "version": "0.1.0",
+  "name": "repo-oc",
+  "version": "0.1.1",
   "description": "TUI menu to jump to a repo and launch opencode --auto",
   "type": "module",
   "license": "MIT",
+  "bin": {
+    "repo": "bin/repo.mjs"
+  },
+  "files": [
+    "bin/repo.mjs",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BIMpraxis/repo.git"

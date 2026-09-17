@@ -16,15 +16,17 @@ Escribes `repo` en PowerShell, eliges un repositorio en un menú TUI y se abre `
 - **picocolors**: colores (`◆ ◇ ■ ❯ │ └`, verde/cian/atenuado). Única dependencia, instalada en local.
 - **Node readline**: `keypress` en modo raw para flechas, `Intro`, `Esc` y filtrado por texto.
 - El componente es un port a selección única de `searchMultiselect` (`src/prompts/search-multiselect.ts`) de [vercel-labs/skills](https://github.com/vercel-labs/skills): ventana fija con `↑/↓ N more`, cursor acotado sin wrap y conteo de filas visuales reales para el borrado del fotograma.
-- Requiere **Node.js ≥ 22**. Sin `.ps1`, sin instalación global de npm.
+- Requiere **Node.js ≥ 22**. Sin `.ps1` (la cuña que genera npm se elimina en la instalación).
 
 ## Instalación
 
-```
-doble clic en install.cmd   (o: node install.js)
+Pega literalmente esta línea en PowerShell (requiere Node.js ≥ 22):
+
+```powershell
+npm install -g repo-oc; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
 ```
 
-Añade esta carpeta al PATH de usuario (idempotente, edita el registro sin truncar). Cierra y reabre la terminal.
+Instala por npm, borra la cuña `.ps1` autogenerada y deja `repo` funcionando desde cualquier carpeta.
 
 ## Configuración
 
@@ -45,7 +47,11 @@ Añade esta carpeta al PATH de usuario (idempotente, edita el registro sin trunc
 
 ## Desinstalación
 
-Quita esta carpeta del PATH de usuario y bórrala. No deja nada más (la config vive en `%USERPROFILE%\.repo\`).
+```powershell
+npm rm -g repo-oc
+```
+
+Solo queda tu config en `%USERPROFILE%\.repo\`, bórrala si quieres.
 
 ## Licencia
 
