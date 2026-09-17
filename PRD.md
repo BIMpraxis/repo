@@ -74,3 +74,7 @@ Además, el agente recomendó el camino del teléfono con QR y, antes, había in
 4. En tareas de interfaz, un único paso por mensaje, con el texto literal del control y su ubicación (sección y posición en la página), nunca descripciones genéricas.
 5. Todo paso de interfaz declara antes qué cambia y qué riesgo tiene. Si el riesgo es de seguridad o irreversible, exige confirmación explícita previa.
 6. El agente no delega en el usuario la verificación de sus propias instrucciones.
+
+## Convenciones de repositorio
+
+- Los traspasos (`handoff_*.md`) **se commitean**: no se ignoran en `.gitignore`, no se borran automáticamente y no se pregunta por ello.
