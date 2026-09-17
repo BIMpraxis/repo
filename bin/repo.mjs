@@ -16,6 +16,7 @@ const S_STEP_SUBMIT = pc.green('◇');
 const S_BAR = pc.dim('│');
 const MAX_VISIBLE = 12;
 const cancelSymbol = Symbol('cancel');
+const newSymbol = Symbol('new');
 
 const silentOutput = new Writable({
   write(_chunk, _encoding, callback) {
@@ -116,6 +117,65 @@ function listRepos(roots) {
     }
   }
   return items;
+}
+
+function promptText(message) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      rl.close();
+      resolve(value);
+    };
+    rl.on('close', () => finish(cancelSymbol));
+    rl.on('SIGINT', () => finish(cancelSymbol));
+    rl.question(`${pc.bold(message)} `, (answer) => finish(answer));
+  });
+}
+
+const INVALID_NAME = /[<>:"/\\|?*\u0000-\u001f]/;
+
+async function createRepoFlow(madres) {
+  let madre = madres[0];
+  if (madres.length > 1) {
+    const pick = await searchSelect({
+      message: '¿Bajo qué carpeta madre?',
+      items: madres.map((root) => ({
+        label: root.split(/[\\/]/).filter(Boolean).pop(),
+        value: root,
+      })),
+    });
+    if (pick === cancelSymbol || !pick) return cancelSymbol;
+    madre = pick;
+  }
+  for (;;) {
+    const answer = await promptText('Nombre del nuevo repo:');
+    if (answer === cancelSymbol) return cancelSymbol;
+    const name = answer.trim();
+    if (!name) {
+      console.log(pc.yellow('Nombre vacío, prueba otra vez.'));
+      continue;
+    }
+    if (INVALID_NAME.test(name) || name === '.' || name === '..') {
+      console.log(pc.yellow('Nombre no válido en Windows (evita <>:"/\\|?*).'));
+      continue;
+    }
+    const dest = join(madre, name);
+    if (existsSync(dest)) {
+      console.log(pc.yellow(`Ya existe ${dest}. Prueba otro nombre.`));
+      continue;
+    }
+    try {
+      mkdirSync(dest);
+    } catch (error) {
+      console.log(pc.yellow(`No se pudo crear ${dest}: ${error.message}`));
+      continue;
+    }
+    console.log(`Creado ${dest}`);
+    return dest;
+  }
 }
 
 async function searchSelect({ message, items, maxVisible = MAX_VISIBLE }) {
@@ -263,13 +323,20 @@ if (!process.stdin.isTTY) {
 }
 
 const roots = loadRoots();
-const items = listRepos(roots);
-if (items.length === 0) {
-  console.log(`Sin repos. Revisa ${CONFIG_PATH}`);
+const madres = roots.filter((root) => existsSync(root));
+if (madres.length === 0) {
+  console.log(`Sin carpetas madre. Revisa ${CONFIG_PATH}`);
   process.exit(1);
 }
+const items = listRepos(roots);
+items.push({ label: '+ Nuevo repo…', value: newSymbol });
 const chosen = await searchSelect({ message: '¿A qué repo quieres ir?', items });
 if (chosen === cancelSymbol || !chosen) process.exit(0);
-console.log(`Abriendo opencode en ${chosen}...`);
-const child = spawn('opencode --auto', { stdio: 'inherit', shell: true, cwd: chosen });
+let target = chosen;
+if (chosen === newSymbol) {
+  target = await createRepoFlow(madres);
+  if (target === cancelSymbol) process.exit(0);
+}
+console.log(`Abriendo opencode en ${target}...`);
+const child = spawn('opencode --auto', { stdio: 'inherit', shell: true, cwd: target });
 child.on('exit', (code) => process.exit(code ?? 0));
