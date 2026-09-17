@@ -10,6 +10,8 @@
 
 **Elegido**: item seleccionado por el cursor en la TUI, confirmado con Intro. _Avoid_: seleccionado, marcado, target.
 
+**Nuevo repo**: entrada al final del menú que crea una carpeta dentro de una carpeta madre y lanza OpenCode en ella. _Avoid_: crear repositorio, alta de repo.
+
 **Lanzar**: ejecutar `opencode --auto` con el repo elegido como cwd actual del proceso hijo. _Avoid_: abrir (ambiguo en Windows entre icono/terminal), ejecutar (genérico).
 
 **Publicar**: subir una versión al registro público de npm. Lo hace el CI al llegar cambios a `main`; a mano solo como emergencia. _Avoid_: desplegar.
