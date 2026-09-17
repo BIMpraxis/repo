@@ -65,5 +65,5 @@ El token que había en `%USERPROFILE%\.npmrc` caducó (E401, verificado el 2026-
 - `repo.cmd` apuntaba a un `repo.js` inexistente: se eliminó el 2026-09-17. El check de referencias `%~dp0` lo habría cazado.
 - `install.cmd` / `install.js` no están en `files`: no viajan en el paquete de npm, solo sirven desde una copia local.
 - En PowerShell, el shim `repo.ps1` que genera npm gana sobre `repo.cmd` y rompe colores y modo raw: de ahí el `Remove-Item` al instalar.
-- `actions/setup-node` con `registry-url` tiene documentación contradictoria entre npm y `semantic-release`. Si el primer release fallara por autenticación, la primera prueba a hacer es quitar esa línea de `release.yml`.
+- `actions/setup-node` **no** debe llevar `registry-url` en el release: escribe un `.npmrc` con un token vacío y `@semantic-release/npm` falla con `EINVALIDNPMTOKEN` en lugar de usar OIDC. Comprobado en la primera ejecución (2026-09-17) y corregido.
 - Node mínimo para el release: 22.22+, o 24.15+ (lo exigen dos plugins de `semantic-release`). El CI usa Node 24.
