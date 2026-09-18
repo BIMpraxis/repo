@@ -4,6 +4,8 @@
 
 Type `repo` in PowerShell, pick a repository from a TUI menu, and `opencode --auto` opens in it, in the same terminal.
 
+<video src="docs/Demo_repo.mp4" controls width="100%"></video>
+
 ## How it works
 
 1. Reads the parent folders from `%USERPROFILE%\.repo\repoconfig.json`.
