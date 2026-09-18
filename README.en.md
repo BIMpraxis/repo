@@ -4,7 +4,7 @@
 
 Type `repo` in PowerShell, pick a repository from a TUI menu, and `opencode --auto` opens in it, in the same terminal.
 
-<video src="docs/Demo_repo.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/6ae0ea35-3f04-4c5f-b0ea-779160a3b612
 
 ## How it works
 
