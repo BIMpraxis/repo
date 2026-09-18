@@ -31,6 +31,7 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 
 ## Estado actual
 - Funcionalidad completa y **validada por el humano** (2026-09-17): la entrada «+ Nuevo repo…» funciona y la instalación desde Git (`npm install -g github:BIMpraxis/repo`) se verificó en un equipo real.
+- Vídeo demo en ambos README **validado por el humano** (2026-09-18): se sirve desde el CDN de GitHub (`user-attachments/assets/...`) como URL desnuda en su propio párrafo, que GitHub convierte en reproductor. *Alternativa descartada*: etiqueta `<video>` con ruta relativa a un `.mp4` commiteado — el sanitizador de GitHub la elimina y deja un párrafo vacío.
 - Última versión publicada en npm: **0.1.1** (2026-09-17), a mano. La publicada por CI será la **0.2.0** cuando se reactive.
 - **npm en pausa (2026-09-17)**: la cuenta está en solo lectura 72 h (lo dispara el uso de un código de recuperación de 2FA) y aún no existe el publicador de confianza. Por eso `release.yml` se lanza solo a mano.
 - **Windows 10 con cuenta local** no ofrece la experiencia de passkeys de Windows 11: el challenge de 2FA con «Windows Hello» en Chrome se queda colgado. Alternativas sin coste, aún **sin probar**: intentarlo en Edge o guardar la passkey en el gestor de Chrome. Detalle en `docs/RELEASE.md`.

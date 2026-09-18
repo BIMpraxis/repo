@@ -2,3 +2,6 @@ node_modules/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# demo videos: served from GitHub's CDN (user-attachments), never committed.
+*.mp4
