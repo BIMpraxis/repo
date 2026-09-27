@@ -7,16 +7,20 @@ Cómo se distribuye y cómo se publica el paquete. Complementa `PRD.md` (motivos
 No hace falta cuenta ni registro. Requiere Node ≥ 22 y Git:
 
 ```powershell
-npm install -g github:BIMpraxis/repo; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force
+npm install -g github:BIMpraxis/repo; Remove-Item "$env:APPDATA\npm\repo.ps1" -Force -ErrorAction SilentlyContinue; repo --install
 ```
 
-Desde una copia local (desarrollo): `npm install -g .`
+Desde una copia local (desarrollo): `npm install -g .; repo --install`
+
+`repo --install` escribe la función `repo` en el perfil de PowerShell (`$PROFILE`) de los hosts que encuentre en el `PATH`; es idempotente, y `--install --dry-run` la muestra sin escribir. **Hay que abrir una terminal nueva** después.
+
+Desinstalación: `repo --uninstall; npm rm -g repo-oc`. El orden importa: la retirada del bloque del perfil la implementa el paquete, así que debe ejecutarse antes de borrarlo.
 
 Ventaja: cero autenticación. El precio es que la instalación baja el repositorio completo y no hay número de versión en el registro.
 
 ## Estado de la publicación en npm (en pausa)
 
-- Última versión publicada: **0.1.1** (2026-09-17), a mano. La siguiente será la **0.2.0**, que ya incluye la entrada «+ Nuevo repo…».
+- Última versión publicada: **0.1.1** (2026-09-17), a mano. La siguiente será la **0.2.0**, que ya incluye la entrada «+ Nuevo repo…» y el cambio de directorio al salir de OpenCode con la función de perfil.
 - **Motivo de la pausa**: la cuenta npm está en solo lectura durante 72 h. Lo dispara el uso de un **código de recuperación de 2FA** (protección preventiva de npm, documentada en el GitHub Changelog del 25/06/2026). Se levanta sola, sin trámites.
 - **Segundo impedimento**: todavía no existe el **publicador de confianza**, que hay que crear una vez desde el navegador con 2FA.
 - Por eso `release.yml` se lanza **solo a mano** (`workflow_dispatch`) y no en cada push: evita ejecuciones en rojo mientras falte el publicador. Cuando exista, se le devuelve el disparo por push a `main`.
@@ -63,6 +67,6 @@ La publicación se autentica con **publicador de confianza** (trusted publishing
 
 - `repo.cmd` apuntaba a un `repo.js` inexistente: se eliminó el 2026-09-17. El check de referencias `%~dp0` lo habría cazado.
 - `install.cmd` / `install.js` no están en `files`: no viajan en el paquete de npm, solo sirven desde una copia local.
-- En PowerShell, el shim `repo.ps1` que genera npm gana sobre `repo.cmd` y rompe colores y modo raw: de ahí el `Remove-Item` al instalar.
+- En PowerShell, el shim `repo.ps1` que genera npm gana sobre `repo.cmd` y rompe colores y modo raw: de ahí el `Remove-Item` al instalar. La función `repo` del perfil lo eclipsa aunque exista, y está probado que el shim sirve para los flags (`repo --install --dry-run` funcionó a través de él).
 - `actions/setup-node` **no** debe llevar `registry-url` en el release: escribe un `.npmrc` con un token vacío y `@semantic-release/npm` falla con `EINVALIDNPMTOKEN` en lugar de usar OIDC. Comprobado en la primera ejecución (2026-09-17) y corregido.
 - Node mínimo para el release: 22.22+, o 24.15+ (lo exigen dos plugins de `semantic-release`). El CI usa Node 24.

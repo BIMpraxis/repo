@@ -13,13 +13,25 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 
 3. **Config en `%USERPROFILE%\.repo\repoconfig.json`**  
    Ubicación por usuario, no por proyecto. JSON simple `{ roots: string[] }`. Se autocrea vacío en el primer arranque.  
-   *Contrato irrenunciable*: la aplicación solo escribe en ese archivo al crearlo; después lo edita el humano a mano.
+   *Contrato irrenunciable*: la aplicación solo escribe en ese archivo al crearlo; después lo edita el humano a mano. Los otros dos ficheros que escribe el paquete (el de destino en `%TEMP%` y el perfil de PowerShell) están en la decisión 5.
 
 4. **Instalación global con npm y borrado del shim `.ps1`**  
-   npm deja en `%APPDATA%\npm` un envoltorio `repo.ps1` que PowerShell prefiere y que rompe los colores y el modo raw. Borrarlo forma parte del contrato de instalación documentado en el README.
+   npm deja en `%APPDATA%\npm` un envoltorio `repo.ps1` que PowerShell prefiere y que rompe los colores y el modo raw. Borrarlo forma parte del contrato de instalación documentado en el README. Con la función `repo` instalada (decisión 5) el shim queda además eclipsado, pero borrarlo sigue siendo el contrato.
 
-5. **Sin `cd` persistente**  
-   Un proceso hijo no puede cambiar el directorio de la shell desde la que se lanzó: al cerrar OpenCode vuelves a tu carpeta original. Por eso existe el menú y se lanza como proceso hijo en lugar de cambiar de carpeta.
+5. **El `cd` lo hace la shell, no el proceso hijo**  
+   Un proceso hijo no puede cambiar el directorio de la shell que lo lanzó (verificado). Por eso el paquete instala una función `repo` en el perfil de PowerShell: la función ejecuta `repo.cmd` como siempre y, al recuperar el control, lee la ruta elegida y hace `Set-Location`. La ruta viaja por un fichero en `%TEMP%` cuyo nombre lleva el `PID` de la sesión (o la ruta que indique la variable de entorno `REPO_OC_TARGET`), de modo que dos sesiones simultáneas no se pisan.  
+   *Alternativas descartadas, con el motivo medido*:  
+   - **Capturar la salida estándar** (TUI por `stderr`, ruta por `stdout`): PowerShell 5.1 decodifica la salida de los procesos nativos con la página de códigos OEM (`ibm850` en este equipo), así que una ruta con acentos llega corrupta (medido: una `ñ` llega como dos caracteres). Además obligaría a duplicar el camino de la TUI.  
+   - **Lanzar `opencode` desde la función por su nombre**: en PowerShell resuelve al shim `opencode.ps1` de npm, no a `opencode.cmd` (medido), y cambiaría el binario que se ejecuta hoy.  
+   - **Inyectar pulsaciones en la consola padre** (`AttachConsole` + `WriteConsoleInput`): escribe en el prompt de un shell en estado desconocido; frágil y sorprendente.  
+   - **Un `repo.ps1` propio en `%APPDATA%\npm`**: npm lo sobrescribe en cada instalación; la función del perfil sobrevive.  
+   - **Un fichero de transporte con nombre fijo**: dos sesiones simultáneas se pisaban (fallo detectado en pruebas); el nombre con `PID` lo elimina por diseño.  
+   *Contratos y límites*:  
+   - El bloque que se escribe en el perfil es **ASCII puro** a propósito: PowerShell 5.1 no detecta UTF-8 sin BOM, así que el bloque debe funcionar con cualquier codificación previa del fichero.  
+   - Al escribir el perfil se preserva el BOM si ya existía y los finales de línea se normalizan a CRLF. `--install` es idempotente y `--uninstall` deja el fichero byte a byte como estaba, salvo el bloque.  
+   - Solo funciona en **Windows + PowerShell**: desde `cmd.exe` o con `powershell -NoProfile` no hay `cd`, y el comportamiento es el anterior sin errores.  
+   - La función se instala bajo demanda (`repo --install`), nunca durante `npm install`; `--uninstall` la retira y debe ejecutarse antes de desinstalar el paquete.  
+   - El fichero de destino puede quedar huérfano si se cierra la ventana a lo bruto durante OpenCode; la propia sesión lo reescribe o lo borra en la siguiente ejecución.
 
 ## Distribución (contrato)
 - **Vía vigente — instalación desde Git**: `npm install -g github:BIMpraxis/repo` (o `npm install -g .` desde una copia). No requiere registro, ni cuenta, ni autenticación.
@@ -31,6 +43,7 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 
 ## Estado actual
 - Funcionalidad completa y **validada por el humano** (2026-09-17): la entrada «+ Nuevo repo…» funciona y la instalación desde Git (`npm install -g github:BIMpraxis/repo`) se verificó en un equipo real.
+- Cambio de directorio al salir de OpenCode y flags `--install`, `--uninstall` y `--dry-run` **validados por el humano** (2026-09-27), incluidos dos sesiones simultáneas y una ruta con acentos. Queda por validar la instalación desde GitHub actualizada en un equipo limpio (el `README.md` ya la describe).
 - Vídeo demo en ambos README **validado por el humano** (2026-09-18): se sirve desde el CDN de GitHub (`user-attachments/assets/...`) como URL desnuda en su propio párrafo, que GitHub convierte en reproductor. *Alternativa descartada*: etiqueta `<video>` con ruta relativa a un `.mp4` commiteado — el sanitizador de GitHub la elimina y deja un párrafo vacío.
 - Última versión publicada en npm: **0.1.1** (2026-09-17), a mano. La publicada por CI será la **0.2.0** cuando se reactive.
 - **npm en pausa (2026-09-17)**: la cuenta está en solo lectura 72 h (lo dispara el uso de un código de recuperación de 2FA) y aún no existe el publicador de confianza. Por eso `release.yml` se lanza solo a mano.
@@ -38,6 +51,7 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 
 ## Limitaciones actuales
 - La TUI necesita una terminal interactiva: sin ella el programa sale con error a propósito, y no es automatizable sin una PTY, así que la interfaz se valida a mano.
+- El `cd` al salir de OpenCode existe solo en **Windows + PowerShell** con la función instalada: en `cmd.exe`, en `bash` o con `powershell -NoProfile` se mantiene el comportamiento anterior.
 - `install.cmd`/`install.js` (alta de la carpeta en el PATH del usuario) no viajan en el paquete de npm; solo sirven desde una copia local del repositorio.
 - Publicar desde este PC sigue exigiendo `npm login` con 2FA: es la vía de emergencia, no la normal.
 
@@ -45,6 +59,8 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 - Comando `repo config` para editar `repoconfig.json` desde la TUI.
 - Autocompletado de bash/zsh/fish para nombres de repo.
 - Pruebas automáticas de la TUI con una PTY.
+- Equivalente del `cd` para `cmd.exe`, que queda fuera por ahora.
+- Probar la instalación en un equipo con PowerShell 7 (`pwsh`) instalado; aquí solo hay Windows PowerShell 5.1.
 
 ## Regla de guiado de interfaces (informe de negligencia, 2026-09-17)
 
