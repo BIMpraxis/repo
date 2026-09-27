@@ -16,6 +16,8 @@
 
 **Fichero de destino**: fichero temporal en `%TEMP%` donde `repo` escribe la ruta elegida para que la función `repo` haga el `cd`; su nombre lleva el `PID` de la sesión. _Avoid_: fichero de traspaso, fichero de estado.
 
+**Bloque del perfil**: fragmento del perfil de PowerShell delimitado por `# >>> repo-oc >>>` y `# <<< repo-oc <<<` que `repo --install` escribe y `repo --uninstall` retira. _Avoid_: sección, trozo de perfil.
+
 **Lanzar**: ejecutar `opencode --auto` con el repo elegido como cwd actual del proceso hijo. _Avoid_: abrir (ambiguo en Windows entre icono/terminal), ejecutar (genérico).
 
 **Publicar**: subir una versión al registro público de npm. Lo hace el CI al llegar cambios a `main`; a mano solo como emergencia. _Avoid_: desplegar.
@@ -36,6 +38,7 @@
 - Un **repositorio** pertenece a exactamente una **carpeta madre**.
 - El proceso hijo hereda la terminal del **elegido** por la TUI; al terminar, la **función `repo`** deja la terminal en el directorio del repositorio **elegido**.
 - El **fichero de destino** comunica la ruta del **elegido** desde el proceso hijo hasta la **función `repo`**.
+- El **bloque del perfil** contiene la **función `repo`**.
 - Un **release** agrupa una **publicación**, un tag y una entrada de CHANGELOG.
 - Un **publicador de confianza** autoriza exactamente un workflow; sin él, la **publicación** desde el CI falla.
 - Una **publicación** sube solo los archivos declarados en `files`; el resto del repositorio no viaja.
