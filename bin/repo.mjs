@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { join, dirname } from 'node:path';
+import { spawn, execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import * as readline from 'node:readline';
 import { stripVTControlCharacters } from 'node:util';
 import { Writable } from 'node:stream';
@@ -97,6 +98,7 @@ function countVisualRowsForLines(lines, columns) {
 
 const CONFIG_DIR = join(process.env.USERPROFILE ?? process.env.HOME, '.repo');
 const CONFIG_PATH = join(CONFIG_DIR, 'repoconfig.json');
+const TARGET_FILE = process.env.REPO_OC_TARGET || join(tmpdir(), 'repo-oc-target.txt');
 
 function loadRoots() {
   if (!existsSync(CONFIG_PATH)) {
@@ -317,6 +319,135 @@ async function searchSelect({ message, items, maxVisible = MAX_VISIBLE }) {
   });
 }
 
+const HOSTS = ['powershell', 'pwsh'];
+const SNIPPET_OPEN = '# >>> repo-oc >>>';
+const SNIPPET_CLOSE = '# <<< repo-oc <<<';
+const SNIPPET = [
+  SNIPPET_OPEN,
+  'function repo {',
+  '    $cmd = (Get-Command repo.cmd -ErrorAction SilentlyContinue).Source',
+  "    if (-not $cmd) { Write-Warning 'repo.cmd no encontrada; ejecuta: npm install -g github:BIMpraxis/repo'; return }",
+  '    if ($args.Count -gt 0) { & $cmd @args; return }',
+  '    $target = Join-Path $env:TEMP ("repo-oc-target-{0}.txt" -f $PID)',
+  '    $env:REPO_OC_TARGET = $target',
+  '    Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue',
+  '    & $cmd',
+  '    $env:REPO_OC_TARGET = $null',
+  '    if (Test-Path -LiteralPath $target) {',
+  '        $raw = Get-Content -LiteralPath $target -Raw -Encoding UTF8 -ErrorAction SilentlyContinue',
+  '        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue',
+  "        $path = if ($raw) { $raw.Trim() } else { '' }",
+  '        if ($path -and (Test-Path -LiteralPath $path -PathType Container)) { Set-Location -LiteralPath $path }',
+  '    }',
+  '}',
+  SNIPPET_CLOSE,
+].join('\n');
+
+function resolveProfilePath(host) {
+  const script = '[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($PROFILE))';
+  const out = execFileSync(host, ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' }).trim();
+  return out ? Buffer.from(out, 'base64').toString('utf8') : '';
+}
+
+function collectProfiles() {
+  const list = [];
+  for (const host of HOSTS) {
+    try {
+      const path = resolveProfilePath(host);
+      if (path) list.push({ host, path });
+    } catch (error) {
+      if (error.code === 'ENOENT') console.log(pc.dim(`Host no disponible: ${host} (se omite)`));
+      else console.log(pc.yellow(`No se pudo resolver el perfil de ${host}: ${error.message}`));
+    }
+  }
+  return list;
+}
+
+function hasSnippet(text) {
+  return text.includes(SNIPPET_OPEN) && text.includes(SNIPPET_CLOSE);
+}
+
+function isUpToDate(text) {
+  return text.replace(/\r\n/g, '\n').includes(SNIPPET);
+}
+
+function removeSnippet(text) {
+  const re = new RegExp(`^[ \\t]*${SNIPPET_OPEN}[\\s\\S]*?^[ \\t]*${SNIPPET_CLOSE}[ \\t]*\\r?\\n?`, 'gm');
+  return text.replace(re, '');
+}
+
+function appendSnippet(content) {
+  const crlf = SNIPPET.split('\n').join('\r\n');
+  const base = content.replace(/[\s\uFEFF]+$/, '');
+  if (base === '') return crlf + '\r\n';
+  return base + '\r\n\r\n' + crlf + '\r\n';
+}
+
+function shellSetup({ install, uninstall, dryRun }) {
+  const profiles = collectProfiles();
+  if (profiles.length === 0) {
+    console.error('No hay ningun host de PowerShell en el PATH.');
+    process.exit(1);
+  }
+  const mode = uninstall ? 'uninstall' : 'install';
+  for (const { host, path } of profiles) {
+    const exists = existsSync(path);
+    const raw = exists ? readFileSync(path, 'utf8') : '';
+    const hadBom = raw.startsWith('\uFEFF');
+    const content = hadBom ? raw.slice(1) : raw;
+    const present = hasSnippet(content);
+    console.log(`${pc.bold(host)} -> ${path}`);
+    if (dryRun) {
+      const state = !exists
+        ? 'no existe (se creara)'
+        : present
+          ? isUpToDate(content)
+            ? 'ya instalado y al dia'
+            : 'instalado pero desactualizado (se reemplazara)'
+          : 'sin el bloque (se anadira)';
+      console.log(`  ${state}`);
+      continue;
+    }
+    if (mode === 'install') {
+      if (present && isUpToDate(content)) {
+        console.log(`  ${pc.dim('ya estaba instalado y al dia')}`);
+        continue;
+      }
+      mkdirSync(dirname(path), { recursive: true });
+      const prefix = hadBom || !exists ? '\uFEFF' : '';
+      writeFileSync(path, prefix + appendSnippet(present ? removeSnippet(content) : content));
+      console.log(`  ${pc.green(present ? 'actualizado' : exists ? 'instalado' : 'creado e instalado')}`);
+    } else {
+      if (!present) {
+        console.log(`  ${pc.dim(exists ? 'sin el bloque: nada que retirar' : 'el perfil no existe todavia')}`);
+        continue;
+      }
+      const rest = removeSnippet(content).replace(/[\s\uFEFF]+$/, '');
+      writeFileSync(path, rest === '' ? '' : (hadBom ? '\uFEFF' + rest : rest) + '\r\n');
+      console.log(`  ${pc.green('bloque retirado')}`);
+    }
+  }
+  if (dryRun) {
+    console.log(`\n${pc.dim('--- bloque que se escribiria ---')}\n${SNIPPET}\n${pc.dim('--- fin (dry-run: no se ha escrito nada) ---')}`);
+    return;
+  }
+  if (mode === 'install') console.log('\nAbre una terminal nueva (o ejecuta . $PROFILE) y escribe repo.');
+}
+
+const argv = process.argv.slice(2);
+if (argv.includes('--install') || argv.includes('--uninstall') || argv.includes('--dry-run')) {
+  if (argv.includes('--install') && argv.includes('--uninstall')) {
+    console.error('Usa --install o --uninstall, no los dos a la vez.');
+    process.exit(1);
+  }
+  shellSetup({
+    install: argv.includes('--install') || argv.includes('--dry-run'),
+    uninstall: argv.includes('--uninstall'),
+    dryRun: argv.includes('--dry-run'),
+  });
+  process.exit(0);
+}
+
 if (!process.stdin.isTTY) {
   console.error('repo necesita una terminal interactiva.');
   process.exit(1);
@@ -338,5 +469,6 @@ if (chosen === newSymbol) {
   if (target === cancelSymbol) process.exit(0);
 }
 console.log(`Abriendo opencode en ${target}...`);
+writeFileSync(TARGET_FILE, target);
 const child = spawn('opencode --auto', { stdio: 'inherit', shell: true, cwd: target });
 child.on('exit', (code) => process.exit(code ?? 0));

@@ -43,6 +43,15 @@ if (guard.status === 1 && `${guard.stderr}`.includes('terminal interactiva')) {
   fail(`guard isTTY inesperado: status=${guard.status} stderr="${`${guard.stderr}`.trim()}"`);
 }
 
+const exclusive = spawnSync(process.execPath, [join(ROOT, 'bin/repo.mjs'), '--install', '--uninstall'], {
+  stdio: ['pipe', 'pipe', 'pipe'],
+});
+if (exclusive.status === 1 && `${exclusive.stderr}`.includes('no los dos')) {
+  ok('--install y --uninstall juntos se rechazan con codigo 1');
+} else {
+  fail(`flags exclusivos inesperado: status=${exclusive.status} stderr="${`${exclusive.stderr}`.trim()}"`);
+}
+
 const expected = ['LICENSE', 'README.en.md', 'README.md', 'bin/repo.mjs', 'package.json'];
 try {
   const out = execFileSync('npm pack --dry-run --json', {
