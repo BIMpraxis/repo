@@ -95,4 +95,4 @@ Además, el agente recomendó el camino del teléfono con QR y, antes, había in
 
 ## Convenciones de repositorio
 
-- Los traspasos (`handoff_*.md`) **se commitean**: no se ignoran en `.gitignore`, no se borran automáticamente y no se pregunta por ello.
+- Los traspasos (`handoff_*.md`) son **efímeros y locales**: van en `.gitignore`, no se commitean ni se suben al remoto, y se eliminan al cerrar el ciclo.

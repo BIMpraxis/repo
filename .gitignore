@@ -5,3 +5,6 @@ node_modules/
 
 # demo videos: served from GitHub's CDN (user-attachments), never committed.
 *.mp4
+
+# handoffs: ephemeral by design, local only, never committed or pushed.
+handoff_*.md
