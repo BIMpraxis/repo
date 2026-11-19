@@ -459,13 +459,15 @@ function shellSetup({ install, uninstall, dryRun }) {
     }
     if (mode === 'install') {
       if (present && isUpToDate(content)) {
-        console.log(`  ${pc.dim('ya estaba instalado y al dia')}`);
+        console.log(`  ${pc.dim(`${host}: ya estaba instalado y al dia`)}`);
         continue;
       }
       mkdirSync(dirname(path), { recursive: true });
       const prefix = hadBom || !exists ? '\uFEFF' : '';
       writeFileSync(path, prefix + appendSnippet(present ? removeSnippet(content) : content));
-      console.log(`  ${pc.green(present ? 'actualizado' : exists ? 'instalado' : 'creado e instalado')}`);
+      // El host va en el mensaje: hay un perfil por cada PowerShell instalado
+      // (powershell y pwsh), asi que el mismo estado aparece dos veces a proposito.
+      console.log(`  ${pc.green(`${host}: ${present ? 'actualizado' : exists ? 'instalado' : 'creado e instalado'}`)}`);
     } else {
       if (!present) {
         console.log(`  ${pc.dim(exists ? 'sin el bloque: nada que retirar' : 'el perfil no existe todavia')}`);

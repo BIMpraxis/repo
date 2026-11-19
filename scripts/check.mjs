@@ -105,10 +105,37 @@ const first = changelog.match(/^##\s+\[?(\d+\.\d+\.\d+)\]?/m);
 if (first && first[1] === pkg.version) ok(`CHANGELOG y package.json coinciden en ${pkg.version}`);
 else fail(`CHANGELOG dice ${first ? first[1] : '(nada)'} y package.json dice ${pkg.version}`);
 
-const tests = spawnSync(process.execPath, ['--test', join(ROOT, 'test/lib.test.mjs')], { stdio: 'pipe', encoding: 'utf8' });
+const tests = spawnSync(process.execPath, ['--test', join(ROOT, 'test/lib.test.mjs'), join(ROOT, 'test/e2e.test.mjs')], { stdio: 'pipe', encoding: 'utf8' });
 const summary = `${tests.stdout ?? ''}`.match(/pass (\d+)[\s\S]*?fail (\d+)/);
 if (tests.status === 0) ok(`pruebas locales: ${summary ? summary[1] : '?'} en verde`);
 else fail(`pruebas locales con fallos: ${`${tests.stdout ?? ''}${tests.stderr ?? ''}`.trim().slice(-400)}`);
+
+// Guarda contra el fallo real: un identificador de node:fs usado sin importar
+// solo revienta en tiempo de ejecucion y solo en la rama que no usa dobles.
+for (const file of ['bin/lib.mjs', 'bin/repo.mjs', 'bin/enumerate-root.mjs']) {
+  const text = readFileSync(join(ROOT, file), 'utf8');
+  const imported = new Set(
+    [...text.matchAll(/import \{([^}]+)\} from/g)]
+      .flatMap((match) => match[1].split(','))
+      .map((name) => name.trim().split(' as ').pop())
+      .filter(Boolean),
+  );
+  const declared = new Set([...text.matchAll(/(?:const|let|function|class)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+  const suspects = [
+    'readdirSync', 'lstatSync', 'statSync', 'existsSync', 'realpathSync',
+    'readFileSync', 'writeFileSync', 'mkdirSync', 'rmSync', 'renameSync',
+    'tmpdir', 'homedir', 'dirname', 'spawn', 'execFileSync',
+  ];
+  const missing = suspects.filter(
+    (name) =>
+      new RegExp(`\\b${name}\\b`).test(text) &&
+      !imported.has(name) &&
+      !declared.has(name) &&
+      !new RegExp(`^\\s*${name}\\s*:`).test(text),
+  );
+  if (missing.length === 0) ok(`${file}: sin identificadores huerfanos`);
+  else fail(`${file} usa sin importar: ${missing.join(', ')}`);
+}
 
 if (errors.length > 0) {
   console.error(`\n${errors.length} comprobacion(es) fallidas`);

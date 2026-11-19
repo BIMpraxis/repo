@@ -22,6 +22,19 @@ const UNC = '\\\\atsantiago\\INDUSTRIAL_VARIOS\\VARIOS\\Biblioteca Industrial\\P
 const SCRIPTS = `${UNC}\\Scripts AutoCAD`;
 const LOCAL = new Set(['C']);
 
+// Regresion: la rama por defecto (sin io inyectado) es la que usa repo de verdad.
+// Antes del arreglo lanzaba ReferenceError: readdirSync is not defined.
+test('buildMenu sin io inyectado usa el sistema de archivos real', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repo-oc-real-'));
+  try {
+    mkdirSync(join(dir, 'proyecto-uno'));
+    const menu = buildMenu({ roots: [dir], shortcuts: [], catalog: { items: [] } });
+    assert.ok(menu.items.some((item) => item.label.endsWith('/proyecto-uno')));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('una UNC se reconoce sin tocar el sistema de archivos', () => {
   assert.equal(isUncPath(SCRIPTS), true);
   assert.equal(classifyRoot(SCRIPTS, LOCAL).kind, 'remote');

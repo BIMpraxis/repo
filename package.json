@@ -21,7 +21,7 @@
   },
   "scripts": {
     "check": "node scripts/check.mjs",
-    "test": "node --test test/lib.test.mjs"
+    "test": "node --test test/lib.test.mjs test/e2e.test.mjs"
   },
   "repository": {
     "type": "git",
