@@ -20,6 +20,14 @@
 
 **Lanzar**: ejecutar `opencode --auto` con el repo elegido como cwd actual del proceso hijo. _Avoid_: abrir (ambiguo en Windows entre icono/terminal), ejecutar (genérico).
 
+**Acceso directo**: entrada de `shortcuts` en `repoconfig.json` con nombre visible y ruta exacta; es una dirección, no una copia. Aparece en el menú sin comprobar que exista. _Avoid_: favorito, marcador, enlace.
+
+**Catálogo de red**: archivo local `~/.repo/network-catalog.json` con nombres, rutas, raíz de procedencia y fecha de la última actualización correcta de las madres remotas. Se lee sin validarlo contra la red y solo se renueva con `repo --refresh-network-catalog`. _Avoid_: índice, caché de repos, copia.
+
+**Actualizar carpetas de red**: acción manual que enumera las raíces remotas y reescribe el catálogo. Nunca ocurre al arrancar, al dibujar el menú ni en segundo plano. _Avoid_: sincronizar, refrescar automáticamente.
+
+**Ayudante UNC**: `bin/launch-unc.cmd`, lote que hace `pushd` a la ruta de red, lanza OpenCode y libera la asignación con `popd`. Se ejecuta con un cwd local porque CMD no admite una UNC como directorio actual. _Avoid_: wrapper, lanzador genérico.
+
 **Publicar**: subir una versión al registro público de npm. Lo hace el CI al llegar cambios a `main`; a mano solo como emergencia. _Avoid_: desplegar.
 
 **Release**: conjunto que produce una publicación: entrada en el CHANGELOG, tag `vX.Y.Z`, release en GitHub y versión en npm. _Avoid_: usar «publicación» para todo el conjunto.
@@ -43,6 +51,9 @@
 - Un **publicador de confianza** autoriza exactamente un workflow; sin él, la **publicación** desde el CI falla.
 - Una **publicación** sube solo los archivos declarados en `files`; el resto del repositorio no viaja.
 - Un **shim** es el punto de entrada del comando instalado; su variante `.ps1` rompe la TUI y la **función `repo`** lo eclipsa.
+- Un **acceso directo** es una dirección del menú: no se enumera, no se valida contra la red y compite con las raíces locales por la misma clave de ruta.
+- El **catálogo de red** solo alimenta el menú desde disco; **actualizar carpetas de red** es la única acción que consulta las raíces remotas.
+- El **ayudante UNC** recibe el destino por variable de entorno y devuelve el código de salida de OpenCode, nunca una letra de unidad temporal.
 
 ## Example dialogue
 

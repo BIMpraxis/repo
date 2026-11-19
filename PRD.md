@@ -56,8 +56,30 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 - `install.cmd`/`install.js` (alta de la carpeta en el PATH del usuario) no viajan en el paquete de npm; solo sirven desde una copia local del repositorio.
 - Publicar desde este PC sigue exigiendo `npm login` con 2FA: es la vía de emergencia, no la normal.
 
-## Mejoras pendientes (no comprometidas)
-- Comando `repo config` para editar `repoconfig.json` desde la TUI.
+## Raíces de red: menú local y lanzamiento UNC (2026-11-19)
+
+**Problema.** Con una raíz UNC en `roots`, el arranque consultaba todas las madres (`existsSync` + `readdirSync`) antes de dibujar el menú. Con la red caída o en mantenimiento, el menú se bloqueaba. Además, `spawn(..., { cwd: target })` con una UNC hace que CMD avise y use `C:\Windows`, así que OpenCode arrancaba en el directorio equivocado.
+
+**Decisiones.**
+
+1. **Configuración ampliada, compatible**: `roots` conserva su significado y se añade `shortcuts: [{ name, path }]`. Un acceso directo es una dirección, nunca una copia ni una sincronización. `Scripts AutoCAD` se declara ahí y aparece en el menú sin comprobar existencia, permisos, ruta real ni contenido de su madre.
+2. **Clasificación léxica de rutas** (`isUncPath`, `classifyRoot`): sin tocar el sistema de archivos. Una UNC, una ruta relativa o una unidad no confirmada como local no se enumeran nunca. Para evitar accesos indirectos, solo se recorren raíces cuyo componente no sea vínculo ni unión (`lstat` componente a componente, sin descender).
+3. **Menú sin red** (`buildMenu`): combina accesos directos, descubrimiento local y catálogo local; los duplicados se resuelven por clave de ruta normalizada con precedencia acceso → local → catálogo.
+4. **Catálogo local opcional** en `~/.repo/network-catalog.json`: solo nombres, rutas, raíz de procedencia y fecha. Se lee en local y **solo** se actualiza con `repo --refresh-network-catalog`. Cada raíz se enumera en un proceso hijo (`bin/enumerate-root.mjs`) que puede terminarse por tiempo. Una fuente que falla conserva su entrada anterior; un catálogo ilegible no se sobrescribe.
+5. **Lanzamiento UNC** (`bin/launch-unc.cmd`): el proceso se inicia con un `cwd` local (`dirname(process.execPath)`), nunca con la UNC. El ayudante hace `pushd` con el destino recibido por variable de entorno, ejecuta `cmd /d /c opencode --auto`, guarda el código, hace `popd` y devuelve ese código. Si `pushd` falla, no se ejecuta OpenCode, se escribe un marcador de fallo y se borra el fichero de destino para que el perfil no intente el `cd`.
+6. **Interpolación segura**: el destino nunca se concatena en el comando; viaja por entorno y toda interpolación va entrecomillada, con expansión retardada deshabilitada. Verificado con `&`, `%`, `!`, `^`, paréntesis, espacios y acentos.
+7. **Fichero de destino**: conserva siempre la ruta original, nunca la letra temporal de `pushd`.
+8. **Función `repo` de PowerShell**: un solo `Set-Location` con `try/catch` en lugar de `Test-Path` + `Set-Location`, y el código de salida se preserva. El `Set-Location` sigue accediendo a la red: no hay cero accesos remotos durante todo el ciclo, solo durante el menú.
+
+**Límites declarados.**
+
+- No se copian ni sincronizan repositorios: los archivos siguen en su ubicación original.
+- No se promete acelerar OpenCode sobre archivos remotos; solo se elimina la dependencia de la red al arrancar y al dibujar el menú.
+- Una raíz de red que Windows no permita asignar sigue fallando al abrir, pero ahora con un mensaje persistente y sin abrir OpenCode en `C:\Windows`.
+- La limpieza con `popd` no puede garantizarse si el proceso se mata a la fuerza o se cierra la consola.
+- Falta la validación funcional real contra la red corporativa y la prueba de Ctrl+C con OpenCode real.
+
+## Mejoras pendientes (no comprometidas)- Comando `repo config` para editar `repoconfig.json` desde la TUI.
 - Autocompletado de bash/zsh/fish para nombres de repo.
 - Pruebas automáticas de la TUI con una PTY.
 - Equivalente del `cd` para `cmd.exe`, que queda fuera por ahora.

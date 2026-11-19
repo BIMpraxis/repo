@@ -9,6 +9,9 @@
   },
   "files": [
     "bin/repo.mjs",
+    "bin/lib.mjs",
+    "bin/launch-unc.cmd",
+    "bin/enumerate-root.mjs",
     "README.md",
     "README.en.md",
     "LICENSE"
@@ -17,7 +20,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "test": "node --test test/lib.test.mjs"
   },
   "repository": {
     "type": "git",

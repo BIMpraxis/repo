@@ -1,12 +1,25 @@
 #!/usr/bin/env node
-import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import * as readline from 'node:readline';
 import { stripVTControlCharacters } from 'node:util';
 import { Writable } from 'node:stream';
 import pc from 'picocolors';
+import {
+  buildMenu,
+  catalogItems,
+  classifyRoot,
+  cmdInvocation,
+  isUncPath,
+  localDriveLetters,
+  NEW_SYMBOL,
+  parseJsonText,
+  pathKey,
+  validateConfig,
+} from './lib.mjs';
 
 // Port del prompt de referencia (vercel-labs/skills, src/prompts/search-multiselect.ts):
 // ventana fija, filtro Search, redibujado in situ, cursor acotado (sin wrap).
@@ -17,7 +30,7 @@ const S_STEP_SUBMIT = pc.green('◇');
 const S_BAR = pc.dim('│');
 const MAX_VISIBLE = 12;
 const cancelSymbol = Symbol('cancel');
-const newSymbol = Symbol('new');
+const newSymbol = NEW_SYMBOL;
 
 const silentOutput = new Writable({
   write(_chunk, _encoding, callback) {
@@ -98,27 +111,39 @@ function countVisualRowsForLines(lines, columns) {
 
 const CONFIG_DIR = join(process.env.USERPROFILE ?? process.env.HOME, '.repo');
 const CONFIG_PATH = join(CONFIG_DIR, 'repoconfig.json');
+const CATALOG_PATH = join(CONFIG_DIR, 'network-catalog.json');
+const HELPER_PATH = join(dirname(fileURLToPath(import.meta.url)), 'launch-unc.cmd');
 const TARGET_FILE = process.env.REPO_OC_TARGET || join(tmpdir(), 'repo-oc-target.txt');
+const FAILURE_FILE = process.env.REPO_OC_LAUNCH_FAILURE || join(tmpdir(), `repo-oc-launch-${process.pid}.failed`);
 
-function loadRoots() {
+function loadConfig() {
   if (!existsSync(CONFIG_PATH)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify({ roots: [] }, null, 2));
+    writeFileSync(CONFIG_PATH, JSON.stringify({ roots: [], shortcuts: [] }, null, 2));
     console.log(`Creada config ${CONFIG_PATH}`);
+    return validateConfig({ roots: [], shortcuts: [] });
   }
-  return JSON.parse(readFileSync(CONFIG_PATH, 'utf8')).roots;
+  let raw;
+  try {
+    // El Bloc de notas guarda UTF-8 con BOM: hay que retirarlo antes de parsear.
+    raw = parseJsonText(readFileSync(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    console.error(`No se pudo leer ${CONFIG_PATH}: ${error.message}`);
+    process.exit(1);
+  }
+  const config = validateConfig(raw);
+  for (const warning of config.warnings) console.log(pc.yellow(warning));
+  return config;
 }
 
-function listRepos(roots) {
-  const items = [];
-  for (const root of roots) {
-    if (!existsSync(root)) continue;
-    const madre = root.split(/[\\/]/).filter(Boolean).pop();
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (entry.isDirectory()) items.push({ label: `${madre}/${entry.name}`, value: join(root, entry.name) });
-    }
+function loadCatalog(roots) {
+  if (!existsSync(CATALOG_PATH)) return { items: [], warnings: [], updatedAt: '' };
+  try {
+    return catalogItems(parseJsonText(readFileSync(CATALOG_PATH, 'utf8')), roots);
+  } catch (error) {
+    console.log(pc.yellow(`Catalogo local ilegible (${error.message}); se ignora.`));
+    return { items: [], warnings: [], updatedAt: '' };
   }
-  return items;
 }
 
 function promptText(message) {
@@ -140,19 +165,33 @@ function promptText(message) {
 const INVALID_NAME = /[<>:"/\\|?*\u0000-\u001f]/;
 
 async function createRepoFlow(madres) {
-  let madre = madres[0];
-  if (madres.length > 1) {
+  let madre = madres.length === 1 ? madres[0] : null;
+  if (!madre) {
     const pick = await searchSelect({
       message: '¿Bajo qué carpeta madre?',
-      items: madres.map((root) => ({
-        label: root.split(/[\\/]/).filter(Boolean).pop(),
-        value: root,
+      items: madres.map(({ path, kind }) => ({
+        label: path.split(/[\\/]/).filter(Boolean).pop(),
+        value: path,
+        detail: kind === 'remote' ? `${path}  (red: se comprobara al crear)` : path,
+        kind: 'mother',
       })),
     });
     if (pick === cancelSymbol || !pick) return cancelSymbol;
-    madre = pick;
+    madre = madres.find((entry) => entry.path === pick) ?? { path: pick, kind: 'local' };
+  } else if (madre.kind === 'remote') {
+    // Una unica madre remota no se elige sola: crearia una carpeta sin decision expresa.
+    const pick = await searchSelect({
+      message: 'La unica carpeta madre es remota. ¿Crear ahí?',
+      items: [
+        { label: 'Sí, crear en la carpeta de red', value: madre.path, detail: madre.path, kind: 'mother' },
+        { label: 'Cancelar', value: cancelSymbol, detail: '', kind: 'mother' },
+      ],
+    });
+    if (pick === cancelSymbol || !pick) return cancelSymbol;
   }
+  const remote = madre.kind === 'remote';
   for (;;) {
+    if (remote) console.log(pc.dim(`Se creará en ${madre.path} (acceso a red).`));
     const answer = await promptText('Nombre del nuevo repo:');
     if (answer === cancelSymbol) return cancelSymbol;
     const name = answer.trim();
@@ -164,16 +203,17 @@ async function createRepoFlow(madres) {
       console.log(pc.yellow('Nombre no válido en Windows (evita <>:"/\\|?*).'));
       continue;
     }
-    const dest = join(madre, name);
-    if (existsSync(dest)) {
-      console.log(pc.yellow(`Ya existe ${dest}. Prueba otro nombre.`));
-      continue;
-    }
+    const dest = join(madre.path, name);
     try {
+      // Sin comprobacion previa: el intento de creacion distingue el caso existente.
       mkdirSync(dest);
     } catch (error) {
+      if (error.code === 'EEXIST') {
+        console.log(pc.yellow(`Ya existe ${dest}. Prueba otro nombre.`));
+        continue;
+      }
       console.log(pc.yellow(`No se pudo crear ${dest}: ${error.message}`));
-      continue;
+      return cancelSymbol;
     }
     console.log(`Creado ${dest}`);
     return dest;
@@ -227,6 +267,9 @@ async function searchSelect({ message, items, maxVisible = MAX_VISIBLE }) {
             const prefix = isCursor ? pc.cyan('❯') : ' ';
             const label = isCursor ? pc.underline(item.label) : item.label;
             lines.push(`${S_BAR} ${prefix} ${label}`);
+            if (isCursor && item.detail && item.detail !== item.label) {
+              lines.push(`${S_BAR}    ${pc.dim(item.detail)}`);
+            }
           }
           const after = filtered.length - end;
           if (after > 0) lines.push(`${S_BAR}  ${pc.dim(`↓ ${after} more`)}`);
@@ -332,13 +375,19 @@ const SNIPPET = [
   '    $env:REPO_OC_TARGET = $target',
   '    Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue',
   '    & $cmd',
+  '    $code = $LASTEXITCODE',
   '    $env:REPO_OC_TARGET = $null',
   '    if (Test-Path -LiteralPath $target) {',
   '        $raw = Get-Content -LiteralPath $target -Raw -Encoding UTF8 -ErrorAction SilentlyContinue',
   '        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue',
   "        $path = if ($raw) { $raw.Trim() } else { '' }",
-  '        if ($path -and (Test-Path -LiteralPath $path -PathType Container)) { Set-Location -LiteralPath $path }',
+  '        if ($path) {',
+  '            Write-Host ("Abriendo terminal en " + $path)',
+  '            try { Set-Location -LiteralPath $path -ErrorAction Stop }',
+  '            catch { Write-Warning ("No se pudo cambiar a " + $path + ": " + $_.Exception.Message) }',
+  '        }',
   '    }',
+  '    $global:LASTEXITCODE = $code',
   '}',
   SNIPPET_CLOSE,
 ].join('\n');
@@ -434,7 +483,99 @@ function shellSetup({ install, uninstall, dryRun }) {
   if (mode === 'install') console.log('\nAbre una terminal nueva (o ejecuta . $PROFILE) y escribe repo.');
 }
 
+// Cada fuente se enumera en su propio hijo, que puede terminarse si se bloquea.
+// Solo un resultado completo y correcto reemplaza la fuente anterior.
+function enumerateRoot(root, timeoutMs) {
+  const helper = join(dirname(fileURLToPath(import.meta.url)), 'enumerate-root.mjs');
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [helper, root], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish({ ok: false, root, error: 'tiempo agotado' });
+    }, timeoutMs);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      out += chunk;
+    });
+    child.on('error', (error) => finish({ ok: false, root, error: error.message }));
+    child.on('exit', (code) => {
+      try {
+        const parsed = JSON.parse(out);
+        finish(code === 0 && parsed.ok ? { ok: true, root, entries: parsed.entries } : { ok: false, root, error: parsed.error || `codigo ${code}` });
+      } catch {
+        finish({ ok: false, root, error: `respuesta ilegible (codigo ${code})` });
+      }
+    });
+  });
+}
+
+async function refreshCatalog(roots) {
+  const remote = roots.filter((root) => classifyRoot(root, localDriveLetters()).kind === 'remote');
+  if (remote.length === 0) {
+    console.log('No hay raices de red configuradas que actualizar.');
+    return 0;
+  }
+  let previous = { version: 1, sources: [] };
+  let previousBroken = false;
+  if (existsSync(CATALOG_PATH)) {
+    try {
+      const parsed = parseJsonText(readFileSync(CATALOG_PATH, 'utf8'));
+      if (Array.isArray(parsed.sources)) previous = parsed;
+      else previousBroken = true;
+    } catch {
+      previousBroken = true;
+    }
+  }
+  if (previousBroken) {
+    console.log(pc.yellow(`El catalogo ${CATALOG_PATH} no se pudo leer; no se sobrescribira.`));
+  }
+  const byRoot = new Map(previous.sources.map((source) => [pathKey(source.root), source]));
+  let ok = 0;
+  let failed = 0;
+  for (const root of remote) {
+    console.log(`Consultando ${root} ...`);
+    const result = await enumerateRoot(root, 15000);
+    const key = pathKey(root);
+    if (result.ok) {
+      byRoot.set(key, {
+        root,
+        updatedAt: new Date().toISOString(),
+        entries: result.entries.map(({ name, path }) => ({ name, path })),
+      });
+      console.log(pc.green(`  ${result.entries.length} entradas`));
+      ok += 1;
+    } else {
+      const kept = byRoot.has(key) ? 'se conserva el catalogo anterior' : 'sin catalogo anterior';
+      console.log(pc.yellow(`  no actualizada (${result.error}): ${kept}`));
+      failed += 1;
+    }
+  }
+  if (previousBroken) {
+    console.log(pc.yellow(`El catalogo ${CATALOG_PATH} no se pudo leer; no se sobrescribira.`));
+    return 1;
+  }
+  const sources = [...byRoot.values()];
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  const tmp = `${CATALOG_PATH}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ version: 1, sources }, null, 2));
+  renameSync(tmp, CATALOG_PATH);
+  console.log(`${ok} actualizada(s), ${failed} sin actualizar. Catalogo: ${CATALOG_PATH}`);
+  return failed > 0 ? 1 : 0;
+}
+
 const argv = process.argv.slice(2);
+if (argv.includes('--refresh-network-catalog')) {
+  const { roots } = loadConfig();
+  process.exit(await refreshCatalog(roots));
+}
 if (argv.includes('--install') || argv.includes('--uninstall') || argv.includes('--dry-run')) {
   if (argv.includes('--install') && argv.includes('--uninstall')) {
     console.error('Usa --install o --uninstall, no los dos a la vez.');
@@ -453,14 +594,26 @@ if (!process.stdin.isTTY) {
   process.exit(1);
 }
 
-const roots = loadRoots();
-const madres = roots.filter((root) => existsSync(root));
-if (madres.length === 0) {
-  console.log(`Sin carpetas madre. Revisa ${CONFIG_PATH}`);
+const config = loadConfig();
+const roots = config.roots;
+const catalog = loadCatalog(roots);
+const menu = buildMenu({ roots, shortcuts: config.shortcuts, catalog });
+
+for (const warning of config.warnings) console.log(pc.yellow(warning));
+for (const warning of catalog.warnings) console.log(pc.yellow(warning));
+for (const warning of menu.warnings) console.log(pc.yellow(warning));
+
+const madres = menu.madres;
+const items = menu.items;
+if (items.length === 0) {
+  console.log(`Sin entradas que mostrar. Revisa ${CONFIG_PATH}`);
   process.exit(1);
 }
-const items = listRepos(roots);
-items.push({ label: '+ Nuevo repo…', value: newSymbol });
+if (catalog.updatedAt) {
+  const when = catalog.updatedAt.slice(0, 16).replace('T', ' ');
+  console.log(pc.dim(`Catalogo de red guardado el ${when}; su disponibilidad no se ha comprobado.`));
+}
+
 const chosen = await searchSelect({ message: '¿A qué repo quieres ir?', items });
 if (chosen === cancelSymbol || !chosen) process.exit(0);
 let target = chosen;
@@ -468,7 +621,70 @@ if (chosen === newSymbol) {
   target = await createRepoFlow(madres);
   if (target === cancelSymbol) process.exit(0);
 }
-console.log(`Abriendo opencode en ${target}...`);
-writeFileSync(TARGET_FILE, target);
-const child = spawn('opencode --auto', { stdio: 'inherit', shell: true, cwd: target });
-child.on('exit', (code) => process.exit(code ?? 0));
+
+// La rama local conserva el comportamiento de siempre: shell con el repo como cwd.
+// La rama UNC nunca entrega la ruta remota como cwd: un ayudante CMD hace pushd
+// desde una carpeta local, ejecuta OpenCode y libera la asignacion con popd.
+function launch(target) {
+  const remote = isUncPath(target);
+  console.log(`Abriendo opencode en ${target}...`);
+  if (remote) console.log(pc.dim('Ruta de red: se prepara una unidad temporal mientras dure la sesion.'));
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (code) => {
+      if (settled) return;
+      settled = true;
+      resolve(code);
+    };
+
+    if (!remote) {
+      const child = spawn('opencode --auto', { stdio: 'inherit', shell: true, cwd: target });
+      child.on('error', (error) => {
+        console.error(`No se pudo lanzar opencode: ${error.message}`);
+        // Sin apertura no debe quedar una seleccion que mueva la terminal.
+        rmSync(TARGET_FILE, { force: true });
+        finish(1);
+      });
+      child.on('spawn', () => writeFileSync(TARGET_FILE, target));
+      child.on('exit', (code, signal) => finish(code ?? (signal ? 1 : 0)));
+      return;
+    }
+
+    rmSync(FAILURE_FILE, { force: true });
+    const invocation = cmdInvocation(HELPER_PATH);
+    const child = spawn(invocation.file, invocation.args, {
+      stdio: 'inherit',
+      cwd: dirname(process.execPath),
+      env: {
+        ...process.env,
+        REPO_OC_LAUNCH_TARGET: target,
+        REPO_OC_LAUNCH_FAILURE: FAILURE_FILE,
+        REPO_OC_TARGET: TARGET_FILE,
+      },
+    });
+    child.on('error', (error) => {
+      console.error(`No se pudo preparar el lanzamiento: ${error.message}`);
+      finish(1);
+    });
+    child.on('exit', (code, signal) => {
+      const prepared = !existsSync(FAILURE_FILE);
+      rmSync(FAILURE_FILE, { force: true });
+      if (!prepared) {
+        console.error(`No se abrió OpenCode: falló la preparación de ${target}.`);
+        finish(code || 1);
+        return;
+      }
+      if (signal) {
+        console.error(`OpenCode terminó por la señal ${signal}.`);
+        finish(1);
+        return;
+      }
+      // El perfil solo debe cambiar de carpeta si OpenCode llego a abrirse.
+      writeFileSync(TARGET_FILE, target);
+      finish(code ?? 0);
+    });
+  });
+}
+
+const exitCode = await launch(target);
+process.exit(exitCode);
