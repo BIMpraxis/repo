@@ -49,6 +49,8 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 - Última versión publicada en npm: **0.1.1** (2026-09-17), a mano. La publicada por CI será la **0.2.0** cuando se reactive.
 - **npm en pausa (2026-09-17)**: la cuenta está en solo lectura 72 h (lo dispara el uso de un código de recuperación de 2FA) y aún no existe el publicador de confianza. Por eso `release.yml` se lanza solo a mano.
 - **Windows 10 con cuenta local** no ofrece la experiencia de passkeys de Windows 11: el challenge de 2FA con «Windows Hello» en Chrome se queda colgado. Alternativas sin coste, aún **sin probar**: intentarlo en Edge o guardar la passkey en el gestor de Chrome. Detalle en `docs/RELEASE.md`.
+- **Validado por el humano (2026-11-19)**: `repo` arranca y funciona; el menú sale «rapidísimo» con la raíz UNC configurada y la red en mantenimiento. Es la validación del menú local y de `Scripts AutoCAD`, no del acceso real a la red.
+- **Fallo propio detectado en esa validación**: `bin/lib.mjs` usaba `readdirSync` sin importarlo y el arranque reventaba con `ReferenceError`. Las 30 pruebas de entonces no lo veían porque **siempre inyectaban un `io` de prueba** y nunca ejercitaban la rama por defecto. Corregido en el commit `2bbe382` con tres defensas: prueba unitaria de la rama por defecto, E2E que arranca `bin/repo.mjs` con TTY simulada y guarda en `check.mjs` que detecta identificadores de `node:fs` usados sin importar. Regla derivada: **toda prueba de una función con dobles de prueba debe incluir el camino real**.
 
 ## Limitaciones actuales
 - La TUI necesita una terminal interactiva: sin ella el programa sale con error a propósito, y no es automatizable sin una PTY, así que la interfaz se valida a mano.
@@ -79,11 +81,20 @@ CLI (`repo`) que presenta un menú TUI con los repositorios registrados bajo car
 - La limpieza con `popd` no puede garantizarse si el proceso se mata a la fuerza o se cierra la consola.
 - Falta la validación funcional real contra la red corporativa y la prueba de Ctrl+C con OpenCode real.
 
-## Mejoras pendientes (no comprometidas)- Comando `repo config` para editar `repoconfig.json` desde la TUI.
+**Pendientes de decisión humana (cierre 2026-11-19).**
+
+1. **No existe `CONSTITUTION.md`.** Los AGENTS.md globales la exigen. *Propuesta por defecto*: crearla con la finalidad del proyecto, sus objetivos maestros y los compromisos ya dispersos en este PRD (configuración editable a mano, cero copias de repositorios, secretos fuera del repo, validación humana). No se ha creado sin aprobación expresa.
+2. **Falta validar el acceso real a la UNC** (abrir `Scripts AutoCAD` con el servidor disponible) y **Ctrl+C dentro de OpenCode**. *Propuesta por defecto*: hacerlo en la próxima ventana de red disponible; hasta entonces, la rama UNC queda «implementada y probada en local», no validada.
+3. **`README.en.md` no se ha actualizado.** La orden fue actualizar `README.md`; el inglés queda desincronizado. *Propuesta por defecto*: traducir la misma sección cuando se autorice.
+
+## Mejoras pendientes (no comprometidas)
+
+- Comando `repo config` para editar `repoconfig.json` desde la TUI.
 - Autocompletado de bash/zsh/fish para nombres de repo.
 - Pruebas automáticas de la TUI con una PTY.
 - Equivalente del `cd` para `cmd.exe`, que queda fuera por ahora.
 - Probar la instalación en un equipo con PowerShell 7 (`pwsh`) instalado; aquí solo hay Windows PowerShell 5.1.
+  *Actualización (2026-11-19)*: en este equipo `pwsh` existe y `repo --install` escribe en los dos perfiles (`powershell` y `pwsh`). El mismo mensaje aparece dos veces a propósito; ahora cada línea nombra su host.
 
 ## Regla de guiado de interfaces (informe de negligencia, 2026-09-17)
 

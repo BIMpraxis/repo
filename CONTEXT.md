@@ -58,10 +58,13 @@
 ## Example dialogue
 
 > **Dev:** ¿`repo` guarda la lista en algún sitio o se relee cada vez?  
-> **Experto:** Se relee; `repoconfig.json` contiene solo las madres, y los repos se escanean en cada arranque.
+> **Experto:** Se relee; `repoconfig.json` contiene solo las madres y los **accesos directos**, y los repos locales se escanean en cada arranque. Las entradas de red salen del **catálogo de red**, que no se consulta contra la red.
+
+> **Dev:** Entonces, ¿si el servidor está apagado el menú tarda?  
+> **Experto:** No. Dibujar el menú no toca la red: ni las raíces remotas ni los accesos directos se comprueban. El acceso ocurre solo al abrir un destino o al ejecutar **actualizar carpetas de red**.
 
 > **Dev:** ¿Por qué no hace el `cd` el propio `repo.mjs`?  
-> **Experto:** Porque un proceso hijo no puede cambiar el directorio de su shell; lo hace la **función `repo`** leyendo el **fichero de destino**.
+> **Experto:** Porque un proceso hijo no puede cambiar el directorio de su shell; lo hace la **función `repo`** leyendo el **fichero de destino**. Ese fichero guarda siempre la ruta original, nunca la letra temporal del **ayudante UNC**.
 
 > **Dev:** ¿Entonces publico yo el paquete cuando quiera sacar versión?  
 > **Experto:** No: tú solo escribes el commit y lo subes a `main`. El **release** (versión, CHANGELOG, tag y **publicación**) lo hace el CI.
